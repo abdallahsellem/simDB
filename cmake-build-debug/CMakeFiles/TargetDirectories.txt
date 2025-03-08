@@ -1,0 +1,3 @@
+/home/abdallah-selim/Desktop/SimDB/cmake-build-debug/CMakeFiles/SimDB.dir
+/home/abdallah-selim/Desktop/SimDB/cmake-build-debug/CMakeFiles/edit_cache.dir
+/home/abdallah-selim/Desktop/SimDB/cmake-build-debug/CMakeFiles/rebuild_cache.dir
