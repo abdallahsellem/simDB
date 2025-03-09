@@ -7,6 +7,8 @@ const string dataPath = "../data/";
 const string dataFileType = ".bin";
 const string schemaFileType = ".schema";
 const string indexFileType =".idx";
+const string ID_COLUMN = "ID";
+
 constexpr int headerSize=60 ;
 
 struct DBHeader {
@@ -32,10 +34,12 @@ void writeHeader(const string &tableName,const DBHeader &header)  ;
 struct DBHeader readHeader(const string &tableName) ;
 ColumnInfo parseSchemaLine(const string &line) ;
 vector<ColumnInfo> readSchema(const string &tableName);
+int calculateRecordSize(const string &tableName) ;
 void writeRecord(const string &tableName) ;
 void readRecords(const string &tableName) ;
 
 void createTable() ;
 bool updateIndex(const string &tableName, const int offset)  ;
 void readRecordWithIndex(const string &tableName, int id) ;
-// void updateRecord(const string &tableName) ;
+bool updateRecord(const string &tableName, int id, const vector<string> &newValues) ;
+bool deleteRecord(const string &tableName, int id) ;
