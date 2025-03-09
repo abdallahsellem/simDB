@@ -1,0 +1,3 @@
+ID:int
+Name:string(20)
+Age:int

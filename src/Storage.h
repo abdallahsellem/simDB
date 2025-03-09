@@ -6,6 +6,7 @@ using namespace std ;
 const string dataPath = "../data/";
 const string dataFileType = ".bin";
 const string schemaFileType = ".schema";
+const string indexFileType =".idx";
 constexpr int headerSize=60 ;
 
 struct DBHeader {
@@ -32,8 +33,9 @@ struct DBHeader readHeader(const string &tableName) ;
 ColumnInfo parseSchemaLine(const string &line) ;
 vector<ColumnInfo> readSchema(const string &tableName);
 void writeRecord(const string &tableName) ;
-void readRecord(const string &tableName) ;
+void readRecords(const string &tableName) ;
 
 void createTable() ;
-
+bool updateIndex(const string &tableName, const int offset)  ;
+void readRecordWithIndex(const string &tableName, int id) ;
 // void updateRecord(const string &tableName) ;

@@ -8,7 +8,10 @@ int main()
     // writeHeader("sel.bin",readHeader("sel.bin"));
     createTable();
     writeRecord("em");
-    readRecord("em");
+    writeRecord("em");
+    writeRecord("em");
+    readRecords("em");
+    readRecordWithIndex("em",1);
     return 0 ;
 
 }
