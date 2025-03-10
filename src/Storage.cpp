@@ -564,3 +564,311 @@ bool deleteRecord(const string &tableName, int id) {
     cout << "Record deleted successfully." << endl;
     return true;
 }
+
+
+
+
+// Implementation for Storage.cpp
+
+vector<vector<variant<int, float, string>>> getRecordsWithCondition(
+    const string& tableName,
+    const vector<string>& columnsToReturn,
+    const vector<Condition>& conditions
+) {
+    // Result container - vector of rows, where each row is a vector of column values
+    vector<vector<variant<int, float, string>>> results;
+
+    string filePath = dataPath + tableName + dataFileType;
+    ifstream dataFile(filePath, ios::binary);
+
+    if (!dataFile.is_open()) {
+        cerr << "Error opening data file: " << filePath << endl;
+        return results;
+    }
+
+    // Read the header
+    DBHeader header = readHeader(tableName);
+
+    // Read the schema
+    vector<ColumnInfo> schema = readSchema(tableName);
+
+    // Calculate column offsets for faster access
+    vector<int> columnOffsets(schema.size(), 0);
+    int currentOffset = 0;
+    for (size_t i = 0; i < schema.size(); i++) {
+        columnOffsets[i] = currentOffset;
+        currentOffset += schema[i].size;
+    }
+
+    // Determine which columns to return
+    vector<int> columnIndices;
+    bool returnAllColumns = (columnsToReturn.size() == 1 && columnsToReturn[0] == "*");
+
+    if (!returnAllColumns) {
+        for (const auto& columnName : columnsToReturn) {
+            bool found = false;
+            for (size_t i = 0; i < schema.size(); i++) {
+                if (schema[i].name == columnName) {
+                    columnIndices.push_back(i);
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                cerr << "Warning: Column '" << columnName << "' not found in schema" << endl;
+            }
+        }
+    } else {
+        // Return all columns
+        for (size_t i = 0; i < schema.size(); i++) {
+            columnIndices.push_back(i);
+        }
+    }
+
+    // Calculate record size
+    int recordSize = 0;
+    for (const auto& col : schema) {
+        recordSize += col.size;
+    }
+
+    // Buffer for reading a record
+    vector<char> recordBuffer(recordSize);
+
+    // Process each record
+    for (int recordId = 0; recordId < header.numRecords; recordId++) {
+        // Get the record offset from the index
+        int offset = getIndex(tableName, recordId);
+
+        if (offset == -1) {
+            cerr << "Warning: Could not find offset for record ID " << recordId << endl;
+            continue;
+        }
+
+        // Read the record
+        dataFile.seekg(offset);
+        dataFile.read(recordBuffer.data(), recordSize);
+
+        if (!dataFile) {
+            cerr << "Error reading record ID " << recordId << endl;
+            continue;
+        }
+
+        // Check if record satisfies all conditions
+        bool recordMatches = true;
+
+        for (const auto& condition : conditions) {
+            int colIndex = -1;
+
+            // Find the column index for the condition
+            for (size_t i = 0; i < schema.size(); i++) {
+                if (schema[i].name == condition.columnName) {
+                    colIndex = i;
+                    break;
+                }
+            }
+
+            if (colIndex == -1) {
+                cerr << "Warning: Condition column '" << condition.columnName << "' not found" << endl;
+                recordMatches = false;
+                break;
+            }
+
+            // Get offset to the column in the record
+            int colOffset = columnOffsets[colIndex];
+
+            // Compare based on column type
+            if (schema[colIndex].type == "int") {
+                int recordValue = *reinterpret_cast<int*>(recordBuffer.data() + colOffset);
+                int conditionValue = get<int>(condition.value);
+
+                if (condition.operatorType == "=") {
+                    if (!(recordValue == conditionValue)) recordMatches = false;
+                } else if (condition.operatorType == "!=") {
+                    if (!(recordValue != conditionValue)) recordMatches = false;
+                } else if (condition.operatorType == "<") {
+                    if (!(recordValue < conditionValue)) recordMatches = false;
+                } else if (condition.operatorType == "<=") {
+                    if (!(recordValue <= conditionValue)) recordMatches = false;
+                } else if (condition.operatorType == ">") {
+                    if (!(recordValue > conditionValue)) recordMatches = false;
+                } else if (condition.operatorType == ">=") {
+                    if (!(recordValue >= conditionValue)) recordMatches = false;
+                }
+            }
+            else if (schema[colIndex].type == "float") {
+                float recordValue = *reinterpret_cast<float*>(recordBuffer.data() + colOffset);
+                float conditionValue = get<float>(condition.value);
+
+                if (condition.operatorType == "=") {
+                    if (!(recordValue == conditionValue)) recordMatches = false;
+                } else if (condition.operatorType == "!=") {
+                    if (!(recordValue != conditionValue)) recordMatches = false;
+                } else if (condition.operatorType == "<") {
+                    if (!(recordValue < conditionValue)) recordMatches = false;
+                } else if (condition.operatorType == "<=") {
+                    if (!(recordValue <= conditionValue)) recordMatches = false;
+                } else if (condition.operatorType == ">") {
+                    if (!(recordValue > conditionValue)) recordMatches = false;
+                } else if (condition.operatorType == ">=") {
+                    if (!(recordValue >= conditionValue)) recordMatches = false;
+                }
+            }
+            else if (schema[colIndex].type == "string") {
+                string recordValue(recordBuffer.data() + colOffset,
+                                  strnlen(recordBuffer.data() + colOffset, schema[colIndex].size));
+                string conditionValue = get<string>(condition.value);
+
+                int cmpResult = recordValue.compare(conditionValue);
+
+                if (condition.operatorType == "=") {
+                    if (!(cmpResult == 0)) recordMatches = false;
+                } else if (condition.operatorType == "!=") {
+                    if (!(cmpResult != 0)) recordMatches = false;
+                } else if (condition.operatorType == "<") {
+                    if (!(cmpResult < 0)) recordMatches = false;
+                } else if (condition.operatorType == "<=") {
+                    if (!(cmpResult <= 0)) recordMatches = false;
+                } else if (condition.operatorType == ">") {
+                    if (!(cmpResult > 0)) recordMatches = false;
+                } else if (condition.operatorType == ">=") {
+                    if (!(cmpResult >= 0)) recordMatches = false;
+                }
+            }
+
+            if (!recordMatches) break;
+        }
+
+        // If record matches all conditions, extract requested columns
+        if (recordMatches) {
+            vector<variant<int, float, string>> row;
+
+            for (int colIdx : columnIndices) {
+                int colOffset = columnOffsets[colIdx];
+
+                if (schema[colIdx].type == "int") {
+                    int value = *reinterpret_cast<int*>(recordBuffer.data() + colOffset);
+                    row.push_back(value);
+                }
+                else if (schema[colIdx].type == "float") {
+                    float value = *reinterpret_cast<float*>(recordBuffer.data() + colOffset);
+                    row.push_back(value);
+                }
+                else if (schema[colIdx].type == "string") {
+                    string value(recordBuffer.data() + colOffset,
+                                strnlen(recordBuffer.data() + colOffset, schema[colIdx].size));
+                    row.push_back(value);
+                }
+            }
+
+            results.push_back(row);
+        }
+    }
+
+    dataFile.close();
+    return results;
+}
+
+// Helper function to display the results
+void displayResults(const string& tableName,
+                   const vector<string>& columns,
+                   const vector<vector<variant<int, float, string>>>& results) {
+    // Get schema to determine column types
+    vector<ColumnInfo> schema = readSchema(tableName);
+
+    // Determine column indices and types
+    vector<pair<int, string>> columnInfo;
+    bool displayAllColumns = (columns.size() == 1 && columns[0] == "*");
+
+    if (displayAllColumns) {
+        for (size_t i = 0; i < schema.size(); i++) {
+            columnInfo.push_back({i, schema[i].type});
+        }
+    } else {
+        for (const auto& colName : columns) {
+            for (size_t i = 0; i < schema.size(); i++) {
+                if (schema[i].name == colName) {
+                    columnInfo.push_back({i, schema[i].type});
+                    break;
+                }
+            }
+        }
+    }
+
+    // Display column headers
+    cout << "\n-----------------------------------------\n";
+    if (displayAllColumns) {
+        for (const auto& col : schema) {
+            cout << col.name << "\t";
+        }
+    } else {
+        for (const auto& colName : columns) {
+            cout << colName << "\t";
+        }
+    }
+    cout << "\n-----------------------------------------\n";
+
+    // Display results
+    for (const auto& row : results) {
+        for (size_t i = 0; i < row.size(); i++) {
+            // Get the value based on its type
+            if (holds_alternative<int>(row[i])) {
+                cout << get<int>(row[i]);
+            }
+            else if (holds_alternative<float>(row[i])) {
+                cout << get<float>(row[i]);
+            }
+            else if (holds_alternative<string>(row[i])) {
+                cout << get<string>(row[i]);
+            }
+
+            cout << "\t";
+        }
+        cout << endl;
+    }
+    cout << "-----------------------------------------\n";
+    cout << results.size() << " records found" << endl;
+}
+void displayQueryResults(const string& tableName,
+                          const vector<string>& columns,
+                          const vector<Condition>& conditions) {
+    // Get the records that match the conditions
+    vector<vector<variant<int, float, string>>> results =
+        getRecordsWithCondition(tableName, columns, conditions);
+
+    // Display query information
+    cout << "\nQuery on table: " << tableName << endl;
+    cout << "Columns: ";
+    if (columns.size() == 1 && columns[0] == "*") {
+        cout << "* (all columns)";
+    } else {
+        for (size_t i = 0; i < columns.size(); i++) {
+            cout << columns[i];
+            if (i < columns.size() - 1) cout << ", ";
+        }
+    }
+    cout << endl;
+
+    // Display conditions if any
+    if (!conditions.empty()) {
+        cout << "Conditions: ";
+        for (size_t i = 0; i < conditions.size(); i++) {
+            cout << conditions[i].columnName << " "
+                 << conditions[i].operatorType << " ";
+
+            // Display the condition value based on its type
+            if (holds_alternative<int>(conditions[i].value)) {
+                cout << get<int>(conditions[i].value);
+            } else if (holds_alternative<float>(conditions[i].value)) {
+                cout << get<float>(conditions[i].value);
+            } else if (holds_alternative<string>(conditions[i].value)) {
+                cout << "\"" << get<string>(conditions[i].value) << "\"";
+            }
+
+            if (i < conditions.size() - 1) cout << " AND ";
+        }
+        cout << endl;
+    }
+
+    // Use the existing displayResults function to show the data
+    displayResults(tableName, columns, results);
+}
