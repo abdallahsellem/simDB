@@ -108,7 +108,7 @@ vector<ColumnInfo> readSchema(const string &tableName) {
     while (getline(file, line)) {
         ColumnInfo column = parseSchemaLine(line);
         cout << "Column Parsed: " << column.name << " " << column.type
-             << " " << (column.size ? to_string(column.size) : "") << endl;
+                << " " << (column.size ? to_string(column.size) : "") << endl;
         columns.push_back(column);
     }
     file.close();
@@ -244,25 +244,18 @@ void displayIndexOffsets(const string &tableName) {
 
 // ==================== Table Operations ====================
 
-void createTable() {
-    string tableName;
-    cout << "Please enter table name: ";
-    cin >> tableName;
-    cin.ignore(); // Clear the newline character left in the buffer
-
-    cout << "Please enter schema (press Enter on a blank line to finish):" << endl;
+void createTable(const string &tableName, const string &columns) {
     string schema, line;
-    schema += "ID:int\n";  // Always add ID column first
-
-    while (true) {
-        getline(cin, line);
-        if (line.empty()) {
-            // Stop when the user presses Enter on a blank line
-            break;
+    schema += "ID:int\n"; // Always add ID column first
+    stringstream ss(columns);
+    vector<string> result;
+    while (ss.good()) {
+        string substr;
+        getline(ss, substr, ',');
+        if (!substr.empty()) {
+            schema += substr + "\n";
         }
-        schema += line + "\n";
     }
-
     string schemaPath = dataPath + tableName + schemaFileType;
     string dataFilePath = dataPath + tableName + dataFileType;
 
@@ -289,7 +282,7 @@ void createTable() {
 
 // ==================== Record Operations ====================
 
-void writeRecord(const string &tableName) {
+void writeRecord(const string &tableName, vector<string> values) {
     string filePath = dataPath + tableName + dataFileType;
     fstream file(filePath, ios::in | ios::out | ios::binary);
 
@@ -304,7 +297,7 @@ void writeRecord(const string &tableName) {
     file.seekp(fileHeader.freeOffset, ios::beg);
 
     int recordSize = 0;
-
+    int columnIndex = 0;
     for (auto &column: schemaInfo) {
         if (column.name == "ID") {
             int newID = fileHeader.numRecords; // Use the incremented value
@@ -314,20 +307,19 @@ void writeRecord(const string &tableName) {
             continue;
         }
 
-        cout << "Please enter value for " << column.name << ": ";
         if (column.type == "int") {
-            int value;
-            cin >> value;
+            int value = stoi(values[columnIndex]);
             file.write(reinterpret_cast<const char *>(&value), sizeof(int));
             recordSize += sizeof(int);
         } else if (column.type == "float") {
-            float value;
-            cin >> value;
+            float value = stof(values[columnIndex]);
             file.write(reinterpret_cast<const char *>(&value), sizeof(float));
             recordSize += sizeof(float);
         } else if (column.type == "string") {
-            string value;
-            cin >> value;
+            string value = values[columnIndex];
+            if (!value.empty() && value.front() == '"' && value.back() == '"') {
+                value = value.substr(1, value.size() - 2); // Remove first and last character
+            }
             if (value.size() > column.size) {
                 throw runtime_error("Input exceeds maximum size for column: " + column.name);
             }
@@ -335,6 +327,7 @@ void writeRecord(const string &tableName) {
             file.write(value.c_str(), column.size);
             recordSize += column.size;
         }
+        columnIndex++;
     }
 
     // Update header with new free offset and record count
@@ -566,17 +559,15 @@ bool deleteRecord(const string &tableName, int id) {
 }
 
 
-
-
 // Implementation for Storage.cpp
 
-vector<vector<variant<int, float, string>>> getRecordsWithCondition(
-    const string& tableName,
-    const vector<string>& columnsToReturn,
-    const vector<Condition>& conditions
+vector<vector<variant<int, float, string> > > getRecordsWithCondition(
+    const string &tableName,
+    const vector<string> &columnsToReturn,
+    const vector<Condition> &conditions
 ) {
     // Result container - vector of rows, where each row is a vector of column values
-    vector<vector<variant<int, float, string>>> results;
+    vector<vector<variant<int, float, string> > > results;
 
     string filePath = dataPath + tableName + dataFileType;
     ifstream dataFile(filePath, ios::binary);
@@ -605,7 +596,7 @@ vector<vector<variant<int, float, string>>> getRecordsWithCondition(
     bool returnAllColumns = (columnsToReturn.size() == 1 && columnsToReturn[0] == "*");
 
     if (!returnAllColumns) {
-        for (const auto& columnName : columnsToReturn) {
+        for (const auto &columnName: columnsToReturn) {
             bool found = false;
             for (size_t i = 0; i < schema.size(); i++) {
                 if (schema[i].name == columnName) {
@@ -627,7 +618,7 @@ vector<vector<variant<int, float, string>>> getRecordsWithCondition(
 
     // Calculate record size
     int recordSize = 0;
-    for (const auto& col : schema) {
+    for (const auto &col: schema) {
         recordSize += col.size;
     }
 
@@ -656,7 +647,7 @@ vector<vector<variant<int, float, string>>> getRecordsWithCondition(
         // Check if record satisfies all conditions
         bool recordMatches = true;
 
-        for (const auto& condition : conditions) {
+        for (const auto &condition: conditions) {
             int colIndex = -1;
 
             // Find the column index for the condition
@@ -678,7 +669,7 @@ vector<vector<variant<int, float, string>>> getRecordsWithCondition(
 
             // Compare based on column type
             if (schema[colIndex].type == "int") {
-                int recordValue = *reinterpret_cast<int*>(recordBuffer.data() + colOffset);
+                int recordValue = *reinterpret_cast<int *>(recordBuffer.data() + colOffset);
                 int conditionValue = get<int>(condition.value);
 
                 if (condition.operatorType == "=") {
@@ -694,9 +685,8 @@ vector<vector<variant<int, float, string>>> getRecordsWithCondition(
                 } else if (condition.operatorType == ">=") {
                     if (!(recordValue >= conditionValue)) recordMatches = false;
                 }
-            }
-            else if (schema[colIndex].type == "float") {
-                float recordValue = *reinterpret_cast<float*>(recordBuffer.data() + colOffset);
+            } else if (schema[colIndex].type == "float") {
+                float recordValue = *reinterpret_cast<float *>(recordBuffer.data() + colOffset);
                 float conditionValue = get<float>(condition.value);
 
                 if (condition.operatorType == "=") {
@@ -712,10 +702,9 @@ vector<vector<variant<int, float, string>>> getRecordsWithCondition(
                 } else if (condition.operatorType == ">=") {
                     if (!(recordValue >= conditionValue)) recordMatches = false;
                 }
-            }
-            else if (schema[colIndex].type == "string") {
+            } else if (schema[colIndex].type == "string") {
                 string recordValue(recordBuffer.data() + colOffset,
-                                  strnlen(recordBuffer.data() + colOffset, schema[colIndex].size));
+                                   strnlen(recordBuffer.data() + colOffset, schema[colIndex].size));
                 string conditionValue = get<string>(condition.value);
 
                 int cmpResult = recordValue.compare(conditionValue);
@@ -740,22 +729,20 @@ vector<vector<variant<int, float, string>>> getRecordsWithCondition(
 
         // If record matches all conditions, extract requested columns
         if (recordMatches) {
-            vector<variant<int, float, string>> row;
+            vector<variant<int, float, string> > row;
 
-            for (int colIdx : columnIndices) {
+            for (int colIdx: columnIndices) {
                 int colOffset = columnOffsets[colIdx];
 
                 if (schema[colIdx].type == "int") {
-                    int value = *reinterpret_cast<int*>(recordBuffer.data() + colOffset);
+                    int value = *reinterpret_cast<int *>(recordBuffer.data() + colOffset);
                     row.push_back(value);
-                }
-                else if (schema[colIdx].type == "float") {
-                    float value = *reinterpret_cast<float*>(recordBuffer.data() + colOffset);
+                } else if (schema[colIdx].type == "float") {
+                    float value = *reinterpret_cast<float *>(recordBuffer.data() + colOffset);
                     row.push_back(value);
-                }
-                else if (schema[colIdx].type == "string") {
+                } else if (schema[colIdx].type == "string") {
                     string value(recordBuffer.data() + colOffset,
-                                strnlen(recordBuffer.data() + colOffset, schema[colIdx].size));
+                                 strnlen(recordBuffer.data() + colOffset, schema[colIdx].size));
                     row.push_back(value);
                 }
             }
@@ -769,14 +756,14 @@ vector<vector<variant<int, float, string>>> getRecordsWithCondition(
 }
 
 // Helper function to display the results
-void displayResults(const string& tableName,
-                   const vector<string>& columns,
-                   const vector<vector<variant<int, float, string>>>& results) {
+void displayResults(const string &tableName,
+                    const vector<string> &columns,
+                    const vector<vector<variant<int, float, string> > > &results) {
     // Get schema to determine column types
     vector<ColumnInfo> schema = readSchema(tableName);
 
     // Determine column indices and types
-    vector<pair<int, string>> columnInfo;
+    vector<pair<int, string> > columnInfo;
     bool displayAllColumns = (columns.size() == 1 && columns[0] == "*");
 
     if (displayAllColumns) {
@@ -784,7 +771,7 @@ void displayResults(const string& tableName,
             columnInfo.push_back({i, schema[i].type});
         }
     } else {
-        for (const auto& colName : columns) {
+        for (const auto &colName: columns) {
             for (size_t i = 0; i < schema.size(); i++) {
                 if (schema[i].name == colName) {
                     columnInfo.push_back({i, schema[i].type});
@@ -797,27 +784,25 @@ void displayResults(const string& tableName,
     // Display column headers
     cout << "\n-----------------------------------------\n";
     if (displayAllColumns) {
-        for (const auto& col : schema) {
+        for (const auto &col: schema) {
             cout << col.name << "\t";
         }
     } else {
-        for (const auto& colName : columns) {
+        for (const auto &colName: columns) {
             cout << colName << "\t";
         }
     }
     cout << "\n-----------------------------------------\n";
 
     // Display results
-    for (const auto& row : results) {
+    for (const auto &row: results) {
         for (size_t i = 0; i < row.size(); i++) {
             // Get the value based on its type
             if (holds_alternative<int>(row[i])) {
                 cout << get<int>(row[i]);
-            }
-            else if (holds_alternative<float>(row[i])) {
+            } else if (holds_alternative<float>(row[i])) {
                 cout << get<float>(row[i]);
-            }
-            else if (holds_alternative<string>(row[i])) {
+            } else if (holds_alternative<string>(row[i])) {
                 cout << get<string>(row[i]);
             }
 
@@ -828,12 +813,13 @@ void displayResults(const string& tableName,
     cout << "-----------------------------------------\n";
     cout << results.size() << " records found" << endl;
 }
-void displayQueryResults(const string& tableName,
-                          const vector<string>& columns,
-                          const vector<Condition>& conditions) {
+
+void displayQueryResults(const string &tableName,
+                         const vector<string> &columns,
+                         const vector<Condition> &conditions) {
     // Get the records that match the conditions
-    vector<vector<variant<int, float, string>>> results =
-        getRecordsWithCondition(tableName, columns, conditions);
+    vector<vector<variant<int, float, string> > > results =
+            getRecordsWithCondition(tableName, columns, conditions);
 
     // Display query information
     cout << "\nQuery on table: " << tableName << endl;
@@ -853,7 +839,7 @@ void displayQueryResults(const string& tableName,
         cout << "Conditions: ";
         for (size_t i = 0; i < conditions.size(); i++) {
             cout << conditions[i].columnName << " "
-                 << conditions[i].operatorType << " ";
+                    << conditions[i].operatorType << " ";
 
             // Display the condition value based on its type
             if (holds_alternative<int>(conditions[i].value)) {

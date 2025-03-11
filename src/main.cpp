@@ -1,19 +1,19 @@
 #include <bits/stdc++.h>
+#include "Parser.h"
 #include "Storage.h"
 using namespace std ;
 
 
 int main()
 {
-    // writeHeader("sel.bin",readHeader("sel.bin"));
-    createTable();
-    writeRecord("em");
-    writeRecord("em") ;
-    writeRecord("em");
-    writeRecord("em") ;
-    writeRecord("em") ;
-    readRecords("em");
-    displayQueryResults("em",{"Name","Age"},{Condition("ID",">",1)});
+
+    while (true) {
+        string query;
+        cout << "Enter SQL Query: ";
+        getline(cin, query); // Read full line input
+
+        executeQuery(query);
+    }
 
     return 0 ;
 

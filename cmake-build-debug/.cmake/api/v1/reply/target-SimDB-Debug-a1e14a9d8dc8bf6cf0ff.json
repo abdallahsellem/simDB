@@ -64,7 +64,9 @@
 			"sourceIndexes" : 
 			[
 				0,
-				1
+				1,
+				2,
+				3
 			]
 		}
 	],
@@ -98,12 +100,26 @@
 			"sourceIndexes" : 
 			[
 				0,
-				1
+				1,
+				2,
+				3
 			]
 		}
 	],
 	"sources" : 
 	[
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/Executer.cpp",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/Parser.cpp",
+			"sourceGroupIndex" : 0
+		},
 		{
 			"backtrace" : 1,
 			"compileGroupIndex" : 0,

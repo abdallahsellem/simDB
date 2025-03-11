@@ -66,10 +66,10 @@ struct DBHeader readHeader(const string &tableName) ;
 ColumnInfo parseSchemaLine(const string &line) ;
 vector<ColumnInfo> readSchema(const string &tableName);
 int calculateRecordSize(const string &tableName) ;
-void writeRecord(const string &tableName) ;
+void writeRecord(const string &tableName,vector<string>values) ;
 void readRecords(const string &tableName) ;
 
-void createTable() ;
+void createTable(const string &tableName,const string &columnsInfoPartq) ;
 bool updateIndex(const string &tableName, const int offset)  ;
 void readRecordWithIndex(const string &tableName, int id) ;
 bool updateRecord(const string &tableName, int id, const vector<string> &newValues) ;

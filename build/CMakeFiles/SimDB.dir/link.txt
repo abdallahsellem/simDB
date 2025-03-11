@@ -1,0 +1,1 @@
+/usr/bin/c++ CMakeFiles/SimDB.dir/src/Parser.cpp.o CMakeFiles/SimDB.dir/src/Storage.cpp.o CMakeFiles/SimDB.dir/src/main.cpp.o -o SimDB 

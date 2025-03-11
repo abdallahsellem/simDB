@@ -1,0 +1,15 @@
+/*
+
+
+CREATE TABLE emp (Name:string(20), Age:int, Salary:float)
+INSERT INTO emp VALUES ("John Doe", 30, 50000.5)
+INSERT INTO emp VALUES ("abdallah Doe", 522, 50000.5)
+INSERT INTO emp VALUES ("selim Doe", 74, 50000.5)
+SELECT * FROM emp
+
+DELETE FROM emp WHERE ID = 1
+
+SELECT * FROM emp
+
+
+ * /
